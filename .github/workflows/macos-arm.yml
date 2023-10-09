@@ -73,6 +73,7 @@ jobs:
         run: | 
           export MACOSX_DEPLOYMENT_TARGET=11.0
           cargo clean && cargo build --release
+          mv target/release/libplugin.dylib target/release/libplugin-aarch64.dylib
 
       - name: Release Plugin
         uses: softprops/action-gh-release@master
@@ -85,4 +86,5 @@ jobs:
             target/release/libplugin.dylib
             target/release/plugin.dll
             target/release/libplugin.so
+            target/release/libplugin-aarch64.dylib
             target/aarch64-unknown-linux-gnu/release/libplugin-linux-aarch64.so
