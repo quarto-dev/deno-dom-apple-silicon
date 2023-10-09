@@ -1,7 +1,7 @@
 name: build-macos-arm
 
 on:
-  workflow_dispatch
+  workflow_dispatch:
   push:
     paths:
       - 'Cargo.toml'
