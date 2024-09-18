@@ -1,15 +1,45 @@
 {
+  "name": "@b-fuze/deno-dom",
+  "version": "0.1.48",
+  "exports": {
+    ".": "./deno-dom-wasm.ts",
+    "./wasm": "./deno-dom-wasm.ts",
+    "./wasm-noinit": "./deno-dom-wasm-noinit.ts",
+    "./native": "./deno-dom-native.ts"
+  },
+  "publish": {
+    "include": [
+      "LICENSE",
+      "README.md",
+      "html-parser",
+      "Cargo.*",
+      "build/deno-wasm/deno-wasm.js",
+      "src",
+      "deno-dom-wasm.ts",
+      "deno-dom-wasm-noinit.ts",
+      "deno-dom-native.ts",
+      "test",
+      "native.test.ts",
+      "wasm.test.ts"
+    ]
+  },
+  "tasks": {
+    "type-check": "deno check ./deno-dom-wasm.ts ./deno-dom-wasm-noinit.ts ./deno-dom-native.ts ./native.test.ts ./wasm.test.ts ./test/units/*.ts"
+  },
+  "imports": {
+    "assert": "jsr:@std/assert@0.225.3",
+    "fs": "jsr:@std/fs@0.229.1",
+    "path": "jsr:@std/path@0.225.1"
+  },
   "fmt": {
-    "files": {
-      "exclude": [
-        "./wpt",
-        "./bench/node_modules",
-        "./src/dom/selectors/nwsapi.js",
-        "./src/dom/selectors/sizzle.js",
-        "./target",
-        "./html-parser",
-        "./.vim"
-      ]
-    }
+    "exclude": [
+      "./wpt",
+      "./bench/node_modules",
+      "./src/dom/selectors/nwsapi.js",
+      "./src/dom/selectors/sizzle.js",
+      "./target",
+      "./html-parser",
+      "./.vim"
+    ]
   }
 }

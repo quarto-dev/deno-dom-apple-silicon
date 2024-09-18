@@ -1,5 +1,5 @@
 import { DOMParser } from "../../deno-dom-wasm.ts";
-import { assertEquals } from "https://deno.land/std@0.85.0/testing/asserts.ts";
+import { assertEquals } from "assert";
 
 const html = `
 <!DOCTYPE html>
@@ -20,7 +20,7 @@ const html = `
 `;
 
 Deno.test("Node.compareDocumentPosition", () => {
-  const doc = new DOMParser().parseFromString(html, "text/html")!;
+  const doc = new DOMParser().parseFromString(html, "text/html");
   const divA = doc.querySelector("#a")!;
   const divB = doc.querySelector("#b")!;
   const divC = doc.querySelector("#c")!;
@@ -29,7 +29,7 @@ Deno.test("Node.compareDocumentPosition", () => {
   const divF = doc.querySelector("#f")!;
   const body = doc.body;
 
-  const doc2 = new DOMParser().parseFromString(html, "text/html")!;
+  const doc2 = new DOMParser().parseFromString(html, "text/html");
   const divA2 = doc2.querySelector("#a")!;
 
   assertEquals([

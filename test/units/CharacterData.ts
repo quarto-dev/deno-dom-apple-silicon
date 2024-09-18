@@ -1,11 +1,11 @@
 import { Comment, DOMParser, NodeType, Text } from "../../deno-dom-wasm.ts";
-import { assertStrictEquals as assertEquals } from "https://deno.land/std@0.85.0/testing/asserts.ts";
+import { assertStrictEquals as assertEquals } from "assert";
 
 Deno.test("CharacterData.nodeValue/data", () => {
   const doc = new DOMParser().parseFromString(
     `foo<!--bar-->`,
     "text/html",
-  )!;
+  );
 
   const text = doc.body.childNodes[0] as Text;
   const comment = doc.body.childNodes[1] as Comment;
@@ -75,13 +75,13 @@ Deno.test("CharacterData.after/before/remove/replaceWith", () => {
   const doc = new DOMParser().parseFromString(
     `foo<!--bar-->`,
     "text/html",
-  )!;
+  );
 
   const text = doc.body.childNodes[0] as Text;
   const comment = doc.body.childNodes[1] as Comment;
 
   assertEquals(doc.body.childNodes.length, 2);
-  assertEquals(text.previousSibling, null);
+  assertEquals((text as any).previousSibling, null);
 
   text.before(new Comment("fizz"));
 
@@ -127,4 +127,15 @@ Deno.test("CharacterData.after/before/remove/replaceWith", () => {
   assertEquals(comment.parentElement, null);
   assertEquals(comment.previousSibling, null);
   assertEquals(comment.nextSibling, null);
+});
+
+Deno.test("CharacterData.textContent", () => {
+  const doc = new DOMParser().parseFromString(
+    `<body>foo</body>`,
+    "text/html",
+  );
+  const text = doc.body.childNodes[0];
+  assertEquals(text.textContent, "foo");
+  text.textContent = "bar";
+  assertEquals(text.textContent, "bar");
 });

@@ -1,5 +1,5 @@
 import { DOMParser } from "../../deno-dom-wasm.ts";
-import { assertStrictEquals as assertEquals } from "https://deno.land/std@0.85.0/testing/asserts.ts";
+import { assertStrictEquals as assertEquals } from "assert";
 
 // TODO: More comprehensive tests
 
@@ -10,7 +10,7 @@ Deno.test("Element.localName", () => {
       <article></article>
     `,
     "text/html",
-  )!;
+  );
 
   const div = doc.querySelector("div")!;
   const article = doc.querySelector("article")!;

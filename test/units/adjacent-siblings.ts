@@ -1,5 +1,5 @@
 import { DOMParser } from "../../deno-dom-wasm.ts";
-import { assertEquals } from "https://deno.land/std@0.85.0/testing/asserts.ts";
+import { assertEquals } from "assert";
 
 Deno.test("Adjacent siblings", () => {
   const doc = new DOMParser().parseFromString(
@@ -9,7 +9,7 @@ Deno.test("Adjacent siblings", () => {
         <div class=a>a</div><div class=b>b</div><!-- foo bar --><div class=c>c</div>
       </div>`,
     "text/html",
-  )!;
+  );
   const divMain = doc.querySelector(".main");
   const divA = doc.querySelector(".a");
   const divB = doc.querySelector(".b");

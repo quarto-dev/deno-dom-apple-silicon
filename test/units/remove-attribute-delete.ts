@@ -1,11 +1,11 @@
 import { DOMParser } from "../../deno-dom-wasm.ts";
-import { assert } from "https://deno.land/std@0.85.0/testing/asserts.ts";
+import { assert } from "assert";
 
 Deno.test("removeAttribute attributes don't show in HTML", () => {
   const doc = new DOMParser().parseFromString(
     "<div><br foo></div>",
     "text/html",
-  )!;
+  );
   const br = doc.querySelector("br")!;
   br.removeAttribute("foo");
 
@@ -16,7 +16,7 @@ Deno.test("removeAttribute attributes are null", () => {
   const doc = new DOMParser().parseFromString(
     "<div><br foo></div>",
     "text/html",
-  )!;
+  );
   const br = doc.querySelector("br")!;
   br.removeAttribute("foo");
 

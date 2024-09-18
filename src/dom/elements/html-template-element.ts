@@ -2,7 +2,7 @@ import { Node } from "../node.ts";
 import { Element } from "../element.ts";
 import { Document } from "../document.ts";
 import { DocumentFragment } from "../document-fragment.ts";
-import { getElementAttributesString, getInnerHtmlFromNodes } from "../utils.ts";
+import { getElementAttributesString, getOuterOrInnerHtml } from "../utils.ts";
 import { fragmentNodesFromString } from "../../deserialize.ts";
 import { CTOR_KEY } from "../../constructor-lock.ts";
 
@@ -72,7 +72,7 @@ export class HTMLTemplateElement extends Element {
   }
 
   get innerHTML(): string {
-    return getInnerHtmlFromNodes(this.content.childNodes, "template");
+    return getOuterOrInnerHtml(this, false);
   }
 
   // Replace children in the `.content`
@@ -89,7 +89,7 @@ export class HTMLTemplateElement extends Element {
 
     // Parse HTML into new children
     if (html.length) {
-      const parsed = fragmentNodesFromString(html);
+      const parsed = fragmentNodesFromString(html, this.localName);
       mutator.push(...parsed.childNodes[0].childNodes);
 
       for (const child of content.childNodes) {

@@ -12,7 +12,7 @@ const HTMLCollectionFakeClass: any = (() => {
   };
 })();
 
-export const HTMLCollectionMutatorSym = Symbol();
+export const HTMLCollectionMutatorSym = Symbol("HTMLCollectionMutatorSym");
 
 // We define the `HTMLCollection` inside a closure to ensure that its
 // `.name === "HTMLCollection"` property stays intact, as we need to manipulate
@@ -20,10 +20,9 @@ export const HTMLCollectionMutatorSym = Symbol();
 const HTMLCollectionClass: any = (() => {
   // @ts-ignore
   class HTMLCollection extends Array<Element> {
-    // @ts-ignore
     forEach(
       cb: (node: Element, index: number, nodeList: Element[]) => void,
-      thisArg: HTMLCollection | undefined = undefined,
+      thisArg?: unknown,
     ) {
       super.forEach(cb, thisArg);
     }

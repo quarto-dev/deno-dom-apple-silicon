@@ -1,4 +1,38 @@
-import { Plug } from "https://deno.land/x/plug/mod.ts";
+/**
+ * @module
+ *
+ * This module exposes the Deno DOM API with the native binary backend.
+ * Unlike the WASM backend the native backend requires more permissions
+ * due to the nature of how native bindings work. They include:
+ *
+ * - `--unstable-ffi`
+ * - `--allow-ffi`
+ * - `--allow-env`
+ * - `--allow-read`
+ * - `--allow-net=deno.land`
+ *
+ * @example
+ * ```ts
+ * import { DOMParser, initParser } from "jsr:@b-fuze/deno-dom/native";
+ *
+ * // ...and when you need Deno DOM make sure you initialize the parser...
+ * await initParser();
+ *
+ * // Then you can use Deno DOM as you would normally
+ * const doc = new DOMParser().parseFromString(
+ *   `
+ *     <h1>Hello World!</h1>
+ *     <p>Hello from <a href="https://deno.land/">Deno!</a></p>
+ *   `,
+ *   "text/html",
+ * );
+ *
+ * const p = doc.querySelector("p")!;
+ * console.log(p.textContent); // "Hello from Deno!"
+ * ```
+ */
+
+import { dlopen } from "jsr:@denosaurs/plug@1.0.3";
 import { register } from "./src/parser.ts";
 
 const nativeEnv = "DENO_DOM_PLUGIN";
@@ -18,7 +52,7 @@ const _symbols = {
     result: "void",
   },
   deno_dom_parse_frag_sync: {
-    parameters: ["buffer", "usize", "buffer"],
+    parameters: ["buffer", "usize", "buffer", "usize", "buffer"],
     result: "void",
   },
   deno_dom_is_big_endian: { parameters: [], result: "u32" },
@@ -32,11 +66,30 @@ if (denoNativePluginPath) {
   // Load the plugin locally
   dylib = Deno.dlopen(denoNativePluginPath, symbols);
 } else {
+  const host = `${Deno.build.os}-${Deno.build.arch}` as const;
+  let name = "";
+
+  switch (host) {
+    case "linux-x86_64":
+    case "darwin-x86_64":
+    case "windows-x86_64":
+      name = "plugin";
+      break;
+
+    case "linux-aarch64":
+      name = "plugin-linux-aarch64";
+      break;
+
+    default:
+      console.error(`deno-dom-native: host ${host} has no supported backend`);
+      Deno.exit(1);
+  }
+
   // Download the plugin
-  dylib = await Plug.prepare({
-    name: "plugin",
+  dylib = await dlopen({
+    name,
     url:
-      "https://github.com/b-fuze/deno-dom/releases/download/v0.1.23-alpha-artifacts/",
+      "https://github.com/b-fuze/deno-dom/releases/download/v0.1.41-alpha-artifacts/",
   }, symbols);
 }
 
@@ -55,16 +108,41 @@ const dylibParseFragSync = dylib.symbols.deno_dom_parse_frag_sync.bind(
 const returnBufSizeLenRaw = new ArrayBuffer(usizeBytes * 2);
 const returnBufSizeLen = new Uint8Array(returnBufSizeLenRaw);
 
+type DocumentParser = (
+  srcBuf: Uint8Array,
+  srcLength: bigint,
+  returnBuf: Uint8Array,
+) => void;
+type FragmentParser = (
+  srcBuf: Uint8Array,
+  srcLength: bigint,
+  contextLocalNameBuf: Uint8Array,
+  contextLocalNameLength: bigint,
+  returnBuf: Uint8Array,
+) => void;
+
 function genericParse(
-  parser: (
-    srcBuf: Uint8Array,
-    srcLength: number,
-    returnBuf: Uint8Array,
-  ) => void,
+  parser: DocumentParser | FragmentParser,
   srcHtml: string,
+  contextLocalName?: string,
 ): string {
   const encodedHtml = utf8Encoder.encode(srcHtml);
-  parser(encodedHtml, encodedHtml.length, returnBufSizeLen);
+  if (contextLocalName) {
+    const encodedContextLocalName = utf8Encoder.encode(contextLocalName);
+    (parser as FragmentParser)(
+      encodedHtml,
+      BigInt(encodedHtml.length),
+      encodedContextLocalName,
+      BigInt(encodedContextLocalName.length),
+      returnBufSizeLen,
+    );
+  } else {
+    (parser as DocumentParser)(
+      encodedHtml,
+      BigInt(encodedHtml.length),
+      returnBufSizeLen,
+    );
+  }
 
   const outBufSize = Number(
     new DataView(returnBufSizeLenRaw).getBigUint64(0, !isBigEndian),
@@ -79,8 +157,8 @@ function parse(html: string): string {
   return genericParse(dylibParseSync, html);
 }
 
-function parseFrag(html: string): string {
-  return genericParse(dylibParseFragSync, html);
+function parseFrag(html: string, contextLocalName?: string): string {
+  return genericParse(dylibParseFragSync, html, contextLocalName);
 }
 
 // Register parse function

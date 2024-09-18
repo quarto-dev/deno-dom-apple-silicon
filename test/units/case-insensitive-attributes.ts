@@ -1,11 +1,11 @@
 import { DOMParser } from "../../deno-dom-wasm.ts";
-import { assertEquals } from "https://deno.land/std@0.85.0/testing/asserts.ts";
+import { assertEquals } from "assert";
 
 Deno.test("Case insensitive attributes", () => {
   const doc = new DOMParser().parseFromString(
     `<div FooBar=baz foobar=qux fOObAR="42"></div>`,
     "text/html",
-  )!;
+  );
   const div = doc.querySelector("div")!;
 
   assertEquals(

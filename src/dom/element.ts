@@ -4,10 +4,13 @@ import { Node, nodesAndTextNodes, NodeType } from "./node.ts";
 import { NodeList, nodeListMutatorSym } from "./node-list.ts";
 import { HTMLCollection } from "./html-collection.ts";
 import {
-  getElementAttributesString,
+  getDatasetHtmlAttrName,
+  getDatasetJavascriptName,
   getElementsByClassName,
-  getInnerHtmlFromNodes,
+  getOuterOrInnerHtml,
   insertBeforeAfter,
+  lowerCaseCharRe,
+  upperCaseCharRe,
 } from "./utils.ts";
 import UtilTypes from "./utils-types.ts";
 
@@ -65,11 +68,11 @@ export class DOMTokenList {
     this.#setIndices();
   }
 
-  get value() {
+  get value(): string {
     return this.#_value;
   }
 
-  get length() {
+  get length(): number {
     return this.#set.size;
   }
 
@@ -96,7 +99,7 @@ export class DOMTokenList {
 
   item(
     index: number,
-  ) {
+  ): string {
     index = Number(index);
     if (Number.isNaN(index) || index === Infinity) index = 0;
     return this[Math.trunc(index) % 2 ** 32] ?? null;
@@ -104,7 +107,7 @@ export class DOMTokenList {
 
   contains(
     element: string,
-  ) {
+  ): boolean {
     return this.#set.has(element);
   }
 
@@ -150,7 +153,7 @@ export class DOMTokenList {
   replace(
     oldToken: string,
     newToken: string,
-  ) {
+  ): boolean {
     if ([oldToken, newToken].some((v) => DOMTokenList.#invalidToken(v))) {
       throw new DOMException(
         "Failed to execute 'replace' on 'DOMTokenList': The token provided must not be empty.",
@@ -178,7 +181,7 @@ export class DOMTokenList {
   toggle(
     element: string,
     force?: boolean,
-  ) {
+  ): boolean {
     if (force !== undefined) {
       const operation = force ? "add" : "remove";
       this[operation](element);
@@ -204,8 +207,8 @@ export class DOMTokenList {
   }
 }
 
-const setNamedNodeMapOwnerElementSym = Symbol();
-const setAttrValueSym = Symbol();
+const setNamedNodeMapOwnerElementSym = Symbol("setNamedNodeMapOwnerElementSym");
+const setAttrValueSym = Symbol("setAttrValueSym");
 export class Attr extends Node {
   #namedNodeMap: NamedNodeMap | null = null;
   #name = "";
@@ -269,11 +272,11 @@ export class Attr extends Node {
     );
   }
 
-  get name() {
+  get name(): string {
     return this.#name;
   }
 
-  get localName() {
+  get localName(): string {
     // TODO: When we make namespaces a thing this needs
     // to be updated
     return this.#name;
@@ -295,11 +298,11 @@ export class Attr extends Node {
     }
   }
 
-  get ownerElement() {
+  get ownerElement(): Element | null {
     return this.#ownerElement ?? null;
   }
 
-  get specified() {
+  get specified(): boolean {
     return true;
   }
 
@@ -313,11 +316,11 @@ export interface NamedNodeMap {
   [index: number]: Attr;
 }
 
-const setNamedNodeMapValueSym = Symbol();
-const getNamedNodeMapValueSym = Symbol();
-const getNamedNodeMapAttrNamesSym = Symbol();
-const getNamedNodeMapAttrNodeSym = Symbol();
-const removeNamedNodeMapAttrSym = Symbol();
+const setNamedNodeMapValueSym = Symbol("setNamedNodeMapValueSym");
+const getNamedNodeMapValueSym = Symbol("getNamedNodeMapValueSym");
+const getNamedNodeMapAttrNamesSym = Symbol("getNamedNodeMapAttrNamesSym");
+const getNamedNodeMapAttrNodeSym = Symbol("getNamedNodeMapAttrNodeSym");
+const removeNamedNodeMapAttrSym = Symbol("removeNamedNodeMapAttrSym");
 export class NamedNodeMap {
   static #indexedAttrAccess = function (
     this: NamedNodeMap,
@@ -330,7 +333,8 @@ export class NamedNodeMap {
 
     const attribute = Object
       .keys(map)
-      .filter((attribute) => map[attribute] !== undefined)[index];
+      .filter((attribute) => map[attribute] !== undefined)[index]
+      ?.slice(1); // Remove "a" for safeAttrName
     return this[getNamedNodeMapAttrNodeSym](attribute);
   };
   #onAttrNodeChange: (attr: string, value: string | null) => void;
@@ -354,12 +358,13 @@ export class NamedNodeMap {
   #ownerElement: Element | null = null;
 
   [getNamedNodeMapAttrNodeSym](attribute: string): Attr {
-    let attrNode = this.#attrNodeCache[attribute];
+    const safeAttrName = "a" + attribute;
+    let attrNode = this.#attrNodeCache[safeAttrName];
     if (!attrNode) {
-      attrNode = this.#attrNodeCache[attribute] = new Attr(
+      attrNode = this.#attrNodeCache[safeAttrName] = new Attr(
         this,
         attribute,
-        this.#map[attribute] as string,
+        this.#map[safeAttrName] as string,
         CTOR_KEY,
       );
       attrNode[setNamedNodeMapOwnerElementSym](this.#ownerElement);
@@ -373,7 +378,7 @@ export class NamedNodeMap {
 
     for (const [name, value] of Object.entries(this.#map)) {
       if (value !== undefined) {
-        names.push(name);
+        names.push(name.slice(1)); // Remove "a" for safeAttrName
       }
     }
 
@@ -381,11 +386,13 @@ export class NamedNodeMap {
   }
 
   [getNamedNodeMapValueSym](attribute: string): string | undefined {
-    return this.#map[attribute];
+    const safeAttrName = "a" + attribute;
+    return this.#map[safeAttrName];
   }
 
   [setNamedNodeMapValueSym](attribute: string, value: string, bubble = false) {
-    if (this.#map[attribute] === undefined) {
+    const safeAttrName = "a" + attribute;
+    if (this.#map[safeAttrName] === undefined) {
       this.#length++;
 
       if (this.#length > this.#capacity) {
@@ -395,11 +402,11 @@ export class NamedNodeMap {
           get: NamedNodeMap.#indexedAttrAccess.bind(this, this.#map, index),
         });
       }
-    } else if (this.#attrNodeCache[attribute]) {
-      this.#attrNodeCache[attribute]![setAttrValueSym](value);
+    } else if (this.#attrNodeCache[safeAttrName]) {
+      this.#attrNodeCache[safeAttrName]![setAttrValueSym](value);
     }
 
-    this.#map[attribute] = value;
+    this.#map[safeAttrName] = value;
 
     if (bubble) {
       this.#onAttrNodeChange(attribute, value);
@@ -411,15 +418,16 @@ export class NamedNodeMap {
    * an element
    */
   [removeNamedNodeMapAttrSym](attribute: string) {
-    if (this.#map[attribute] !== undefined) {
+    const safeAttrName = "a" + attribute;
+    if (this.#map[safeAttrName] !== undefined) {
       this.#length--;
-      this.#map[attribute] = undefined;
+      this.#map[safeAttrName] = undefined;
       this.#onAttrNodeChange(attribute, null);
 
-      const attrNode = this.#attrNodeCache[attribute];
+      const attrNode = this.#attrNodeCache[safeAttrName];
       if (attrNode) {
         attrNode[setNamedNodeMapOwnerElementSym](null);
-        this.#attrNodeCache[attribute] = undefined;
+        this.#attrNodeCache[safeAttrName] = undefined;
       }
     }
   }
@@ -430,7 +438,7 @@ export class NamedNodeMap {
     }
   }
 
-  get length() {
+  get length(): number {
     return this.#length;
   }
 
@@ -445,7 +453,8 @@ export class NamedNodeMap {
   }
 
   getNamedItem(attribute: string): Attr | null {
-    if (this.#map[attribute] !== undefined) {
+    const safeAttrName = "a" + attribute;
+    if (this.#map[safeAttrName] !== undefined) {
       return this[getNamedNodeMapAttrNodeSym](attribute);
     }
 
@@ -457,19 +466,21 @@ export class NamedNodeMap {
       throw new DOMException("Attribute already in use");
     }
 
-    const previousAttr = this.#attrNodeCache[attrNode.name];
+    const safeAttrName = "a" + attrNode.name;
+    const previousAttr = this.#attrNodeCache[safeAttrName];
     if (previousAttr) {
       previousAttr[setNamedNodeMapOwnerElementSym](null);
-      this.#map[attrNode.name] = undefined;
+      this.#map[safeAttrName] = undefined;
     }
 
     attrNode[setNamedNodeMapOwnerElementSym](this.#ownerElement);
-    this.#attrNodeCache[attrNode.name] = attrNode;
+    this.#attrNodeCache[safeAttrName] = attrNode;
     this[setNamedNodeMapValueSym](attrNode.name, attrNode.value, true);
   }
 
   removeNamedItem(attribute: string): Attr {
-    if (this.#map[attribute] !== undefined) {
+    const safeAttrName = "a" + attribute;
+    if (this.#map[safeAttrName] !== undefined) {
       const attrNode = this[getNamedNodeMapAttrNodeSym](attribute);
       this[removeNamedNodeMapAttrSym](attribute);
       return attrNode;
@@ -479,9 +490,20 @@ export class NamedNodeMap {
   }
 }
 
+const XML_NAMESTART_CHAR_RE_SRC = ":A-Za-z_" +
+  String.raw`\u{C0}-\u{D6}\u{D8}-\u{F6}\u{F8}-\u{2FF}\u{370}-\u{37D}` +
+  String
+    .raw`\u{37F}-\u{1FFF}\u{200C}-\u{200D}\u{2070}-\u{218F}\u{2C00}-\u{2FEF}` +
+  String
+    .raw`\u{3001}-\u{D7FF}\u{F900}-\u{FDCF}\u{FDF0}-\u{FFFD}\u{10000}-\u{EFFFF}`;
+const XML_NAME_CHAR_RE_SRC = XML_NAMESTART_CHAR_RE_SRC +
+  String.raw`\u{B7}\u{0300}-\u{036F}\u{203F}-\u{2040}0-9.-`;
+const xmlNamestartCharRe = new RegExp(`[${XML_NAMESTART_CHAR_RE_SRC}]`, "u");
+const xmlNameCharRe = new RegExp(`[${XML_NAME_CHAR_RE_SRC}]`, "u");
+
 export class Element extends Node {
   localName: string;
-  attributes = new NamedNodeMap(this, (attribute, value) => {
+  attributes: NamedNodeMap = new NamedNodeMap(this, (attribute, value) => {
     if (value === null) {
       value = "";
     }
@@ -496,6 +518,7 @@ export class Element extends Node {
     }
   }, CTOR_KEY);
 
+  #datasetProxy: Record<string, string | undefined> | null = null;
   #currentId = "";
   #classList = new DOMTokenList(
     (className) => {
@@ -564,44 +587,49 @@ export class Element extends Node {
   }
 
   get outerHTML(): string {
-    const tagName = this.tagName.toLowerCase();
-    let out = "<" + tagName;
-
-    out += getElementAttributesString(this);
-
-    // Special handling for void elements
-    switch (tagName) {
-      case "area":
-      case "base":
-      case "br":
-      case "col":
-      case "embed":
-      case "hr":
-      case "img":
-      case "input":
-      case "link":
-      case "meta":
-      case "param":
-      case "source":
-      case "track":
-      case "wbr":
-        out += ">";
-        break;
-
-      default:
-        out += ">" + this.innerHTML + `</${tagName}>`;
-        break;
-    }
-
-    return out;
+    return getOuterOrInnerHtml(this, true);
   }
 
   set outerHTML(html: string) {
-    // TODO: Someday...
+    if (this.parentNode) {
+      const { parentElement, parentNode } = this;
+      let contextLocalName = parentElement?.localName;
+
+      switch (parentNode.nodeType) {
+        case NodeType.DOCUMENT_NODE: {
+          throw new DOMException(
+            "Modifications are not allowed for this document",
+          );
+        }
+
+        // setting outerHTML, step 4. Document Fragment
+        // ref: https://w3c.github.io/DOM-Parsing/#dom-element-outerhtml
+        case NodeType.DOCUMENT_FRAGMENT_NODE: {
+          contextLocalName = "body";
+          // fall-through
+        }
+
+        default: {
+          const { childNodes: newChildNodes } =
+            fragmentNodesFromString(html, contextLocalName!).childNodes[0];
+          const mutator = parentNode._getChildNodesMutator();
+          const insertionIndex = mutator.indexOf(this);
+
+          for (let i = newChildNodes.length - 1; i >= 0; i--) {
+            const child = newChildNodes[i];
+            mutator.splice(insertionIndex, 0, child);
+            child._setParent(parentNode);
+            child._setOwnerDocument(parentNode.ownerDocument);
+          }
+
+          this.remove();
+        }
+      }
+    }
   }
 
   get innerHTML(): string {
-    return getInnerHtmlFromNodes(this.childNodes, this.tagName);
+    return getOuterOrInnerHtml(this, false);
   }
 
   set innerHTML(html: string) {
@@ -615,8 +643,10 @@ export class Element extends Node {
 
     // Parse HTML into new children
     if (html.length) {
-      const parsed = fragmentNodesFromString(html);
-      mutator.push(...parsed.childNodes[0].childNodes);
+      const parsed = fragmentNodesFromString(html, this.localName);
+      for (const child of parsed.childNodes[0].childNodes) {
+        mutator.push(child);
+      }
 
       for (const child of this.childNodes) {
         child._setParent(this);
@@ -643,6 +673,103 @@ export class Element extends Node {
 
   set id(id: string) {
     this.setAttribute("id", this.#currentId = id);
+  }
+
+  get dataset(): Record<string, string | undefined> {
+    if (this.#datasetProxy) {
+      return this.#datasetProxy;
+    }
+
+    this.#datasetProxy = new Proxy<Record<string, string | undefined>>({}, {
+      get: (_target, property, _receiver) => {
+        if (typeof property === "string") {
+          const attributeName = getDatasetHtmlAttrName(property);
+          return this.getAttribute(attributeName) ?? undefined;
+        }
+
+        return undefined;
+      },
+
+      set: (_target, property, value, _receiver) => {
+        if (typeof property === "string") {
+          let attributeName = "data-";
+
+          let prevChar = "";
+          for (const char of property) {
+            // Step 1. https://html.spec.whatwg.org/multipage/dom.html#dom-domstringmap-setitem
+            if (prevChar === "-" && lowerCaseCharRe.test(char)) {
+              throw new DOMException(
+                "An invalid or illegal string was specified",
+              );
+            }
+
+            // Step 4. https://html.spec.whatwg.org/multipage/dom.html#dom-domstringmap-setitem
+            if (!xmlNameCharRe.test(char)) {
+              throw new DOMException("String contains an invalid character");
+            }
+
+            // Step 2. https://html.spec.whatwg.org/multipage/dom.html#dom-domstringmap-setitem
+            if (upperCaseCharRe.test(char)) {
+              attributeName += "-";
+            }
+
+            attributeName += char.toLowerCase();
+            prevChar = char;
+          }
+
+          this.setAttribute(attributeName, String(value));
+        }
+
+        return true;
+      },
+
+      deleteProperty: (_target, property) => {
+        if (typeof property === "string") {
+          const attributeName = getDatasetHtmlAttrName(property);
+          this.removeAttribute(attributeName);
+        }
+
+        return true;
+      },
+
+      ownKeys: (_target) => {
+        return this
+          .getAttributeNames()
+          .flatMap((attributeName) => {
+            if (attributeName.startsWith?.("data-")) {
+              return [getDatasetJavascriptName(attributeName)];
+            } else {
+              return [];
+            }
+          });
+      },
+
+      getOwnPropertyDescriptor: (_target, property) => {
+        if (typeof property === "string") {
+          const attributeName = getDatasetHtmlAttrName(property);
+          if (this.hasAttribute(attributeName)) {
+            return {
+              writable: true,
+              enumerable: true,
+              configurable: true,
+            };
+          }
+        }
+
+        return undefined;
+      },
+
+      has: (_target, property) => {
+        if (typeof property === "string") {
+          const attributeName = getDatasetHtmlAttrName(property);
+          return this.hasAttribute(attributeName);
+        }
+
+        return false;
+      },
+    });
+
+    return this.#datasetProxy;
   }
 
   getAttributeNames(): string[] {
@@ -672,6 +799,22 @@ export class Element extends Node {
     if (name === "class") {
       this.#classList.value = "";
     }
+  }
+
+  toggleAttribute(rawName: string, force?: boolean): boolean {
+    const name = String(rawName?.toLowerCase());
+    if (this.hasAttribute(name)) {
+      if ((force === undefined) || (force === false)) {
+        this.removeAttribute(name);
+        return false;
+      }
+      return true;
+    }
+    if ((force === undefined) || (force === true)) {
+      this.setAttribute(name, "");
+      return true;
+    }
+    return false;
   }
 
   hasAttribute(name: string): boolean {
@@ -753,28 +896,48 @@ export class Element extends Node {
     return elements[index - 1] ?? null;
   }
 
-  querySelector(selectors: string): Element | null {
+  querySelector<T = Element>(selectors: string): T | null {
     if (!this.ownerDocument) {
       throw new Error("Element must have an owner document");
     }
 
-    return this.ownerDocument!._nwapi.first(selectors, this);
+    return this.ownerDocument!._nwapi.first(selectors, this) as T;
   }
 
-  querySelectorAll(selectors: string): NodeList {
+  querySelectorAll<T extends Element = Element>(
+    selectors: string,
+  ): NodeList<T> {
     if (!this.ownerDocument) {
       throw new Error("Element must have an owner document");
     }
 
     const nodeList = new NodeList();
     const mutator = nodeList[nodeListMutatorSym]();
-    mutator.push(...this.ownerDocument!._nwapi.select(selectors, this));
 
-    return nodeList;
+    for (const match of this.ownerDocument!._nwapi.select(selectors, this)) {
+      mutator.push(match);
+    }
+
+    return nodeList as NodeList<T>;
   }
 
   matches(selectorString: string): boolean {
     return this.ownerDocument!._nwapi.match(selectorString, this);
+  }
+
+  closest(selectorString: string): Element | null {
+    const { match } = this.ownerDocument!._nwapi; // See note below
+    // deno-lint-ignore no-this-alias
+    let el: Element | null = this;
+    do {
+      // Note: Not using `el.matches(selectorString)` because on a browser if you override
+      // `matches`, you *don't* see it being used by `closest`.
+      if (match(selectorString, el)) {
+        return el;
+      }
+      el = el.parentElement;
+    } while (el !== null);
+    return null;
   }
 
   // TODO: DRY!!!

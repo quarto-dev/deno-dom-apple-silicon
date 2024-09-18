@@ -13,8 +13,8 @@ const NodeListFakeClass: any = (() => {
   };
 })();
 
-export const nodeListMutatorSym = Symbol();
-const nodeListCachedMutator = Symbol();
+export const nodeListMutatorSym = Symbol("nodeListMutatorSym");
+const nodeListCachedMutator = Symbol("nodeListCachedMutator");
 
 // Array methods that we need for NodeList mutator implementation
 const { push, splice, slice, indexOf, filter } = Array.prototype;
@@ -117,16 +117,15 @@ class NodeListMutatorImpl {
 // its prototype and completely change its TypeScript-recognized type.
 const NodeListClass: any = (() => {
   // @ts-ignore
-  class NodeList extends Array<Node> {
-    // @ts-ignore
+  class NodeList<T = Node> extends Array<T> {
     forEach(
-      cb: (node: Node, index: number, nodeList: Node[]) => void,
-      thisArg: NodeList | undefined = undefined,
+      cb: (node: T, index: number, nodeList: T[]) => void,
+      thisArg?: unknown,
     ) {
       super.forEach(cb, thisArg);
     }
 
-    item(index: number): Node | null {
+    item(index: number): T | null {
       return this[index] ?? null;
     }
 
@@ -193,15 +192,15 @@ for (
   NodeListClass.prototype[instanceMethod] = undefined;
 }
 
-export interface NodeList {
+export interface NodeList<T extends Node = Node> {
   new (): NodeList;
-  readonly [index: number]: Node;
+  readonly [index: number]: T;
   readonly length: number;
-  [Symbol.iterator](): Generator<Node>;
+  [Symbol.iterator](): Generator<T>;
 
-  item(index: number): Node;
+  item(index: number): T;
   forEach(
-    cb: (node: Node, index: number, nodeList: Node[]) => void,
+    cb: (node: T, index: number, nodeList: T[]) => void,
     thisArg?: NodeList | undefined,
   ): void;
   [nodeListMutatorSym](): NodeListMutator;

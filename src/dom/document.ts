@@ -82,15 +82,15 @@ export class DocumentType extends Node {
     this.#systemId = systemId;
   }
 
-  get name() {
+  get name(): string {
     return this.#qualifiedName;
   }
 
-  get publicId() {
+  get publicId(): string {
     return this.#publicId;
   }
 
-  get systemId() {
+  get systemId(): string {
     return this.#systemId;
   }
 
@@ -141,19 +141,31 @@ export class Document extends Node {
 
   // Expose the document's NWAPI for Element's access to
   // querySelector/querySelectorAll
-  get _nwapi() {
+  get _nwapi(): SelectorApi {
     return this.#nwapi || (this.#nwapi = getSelectorEngine()(this));
   }
 
-  get documentURI() {
+  get documentURI(): string {
     return this.#documentURI;
   }
 
-  get title() {
+  get title(): string {
     return this.querySelector("title")?.textContent || "";
   }
+  set title(value: string) {
+    let titleElement = this.querySelector("title");
+    if (!titleElement) {
+      const { head } = this;
+      if (!head) return;
 
-  get cookie() {
+      titleElement = this.createElement("title");
+      head.appendChild(titleElement);
+    }
+
+    titleElement.textContent = value;
+  }
+
+  get cookie(): string {
     return ""; // TODO
   }
 
@@ -165,7 +177,7 @@ export class Document extends Node {
     return "visible";
   }
 
-  get hidden() {
+  get hidden(): boolean {
     return false;
   }
 
@@ -261,7 +273,7 @@ export class Document extends Node {
     return fragment;
   }
 
-  importNode(node: Node, deep: boolean = false) {
+  importNode(node: Node, deep: boolean = false): Node {
     const copy = node.cloneNode(deep);
 
     copy._setOwnerDocument(this);
@@ -269,7 +281,7 @@ export class Document extends Node {
     return copy;
   }
 
-  adoptNode(node: Node) {
+  adoptNode(node: Node): Node {
     if (node instanceof Document) {
       throw new DOMException(
         "Adopting a Document node is not supported.",
@@ -282,16 +294,46 @@ export class Document extends Node {
     return node;
   }
 
-  querySelector(selectors: string): Element | null {
-    return this._nwapi.first(selectors, this);
+  // FIXME: This is a bad solution. The correct solution
+  // would be to make `.body` and `.head` dynamic getters,
+  // but that would be a breaking change since `.body`
+  // and `.head` would need to be typed as `Element | null`.
+  // Currently they're typed as `Element` which is incorrect...
+  cloneNode(deep?: boolean): Document {
+    const doc = super.cloneNode(deep) as Document;
+
+    for (const child of doc.documentElement?.childNodes || []) {
+      switch (child.nodeName) {
+        case "BODY": {
+          doc.body = child as Element;
+          break;
+        }
+
+        case "HEAD": {
+          doc.head = child as Element;
+          break;
+        }
+      }
+    }
+
+    return doc;
   }
 
-  querySelectorAll(selectors: string): NodeList {
+  querySelector<T = Element>(selectors: string): T | null {
+    return this._nwapi.first(selectors, this) as T;
+  }
+
+  querySelectorAll<T extends Element = Element>(
+    selectors: string,
+  ): NodeList<T> {
     const nodeList = new NodeList();
     const mutator = nodeList[nodeListMutatorSym]();
-    mutator.push(...this._nwapi.select(selectors, this));
 
-    return nodeList;
+    for (const match of this._nwapi.select(selectors, this)) {
+      mutator.push(match);
+    }
+
+    return nodeList as NodeList<T>;
   }
 
   // TODO: DRY!!!

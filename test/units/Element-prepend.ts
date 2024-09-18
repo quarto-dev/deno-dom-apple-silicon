@@ -1,5 +1,5 @@
 import { Comment, DOMParser, Element, Node } from "../../deno-dom-wasm.ts";
-import { assertStrictEquals as assertEquals } from "https://deno.land/std@0.85.0/testing/asserts.ts";
+import { assertStrictEquals as assertEquals } from "assert";
 
 Deno.test("Element.prepend", () => {
   const doc = new DOMParser().parseFromString(
@@ -11,7 +11,7 @@ Deno.test("Element.prepend", () => {
       </div>
     `,
     "text/html",
-  )!;
+  );
 
   const parent = doc.querySelector("#parent")!;
   const childB = doc.querySelector("#childB")!;
