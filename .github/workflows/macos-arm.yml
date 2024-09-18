@@ -37,7 +37,7 @@ jobs:
       - name: Install rust
         uses: hecrj/setup-rust-action@v1
         with:
-          rust-version: '1.60.0'
+          rust-version: '1.81.0'
 
       - name: Log versions
         run: |
